@@ -1,0 +1,734 @@
+<!doctype html>
+<html lang="ja">
+	<head>
+		<meta charset="utf-8">
+		<title>test33</title>
+		<script type="text/javascript">
+//<![CDATA[
+try{if (!window.CloudFlare) {var CloudFlare=[{verbose:0,p:0,byc:0,owlid:"cf",bag2:1,mirage2:0,oracle:0,paths:{cloudflare:"/cdn-cgi/nexp/dokv=88e434a982/"},atok:"6ab914ed76a6d0442a825679e19ea28a",petok:"81354d6e3fdb48f3ef73851ab6b50706f3b13d48-1406615471-1800",zone:"atpages.jp",rocket:"0",apps:{"ga_key":{"ua":"UA-239611-66","ga_bs":"2"}}}];!function(a,b){a=document.createElement("script"),b=document.getElementsByTagName("script")[0],a.async=!0,a.src="//ajax.cloudflare.com/cdn-cgi/nexp/dokv=97fb4d042e/cloudflare.min.js",b.parentNode.insertBefore(a,b)}()}}catch(e){};
+//]]>
+</script>
+<style>
+			body {
+				font-family: "ＭＳ ゴシック", "MS Gothic", monospace;
+				margin: 0px;
+				overflow: hidden;
+			}
+			a {
+				color: blue;
+			}
+			#info {
+				position: absolute;
+				width: 100%;
+				color: #000;
+				text-align: center;
+			}
+			#button {
+				display: none;
+				top: 20px;
+				position: absolute;
+				cursor: pointer;
+				font-size: 24px;
+				border-radius: 24px;
+				border: 1px solid #666;
+				margin: 4px;
+				padding: 4px 15px 3px 16px;
+				color: #000;
+				background-color: #fcf;
+			}
+			#button:hover {
+				background-color: #fff;
+			}
+			#ctrl {
+				display: none;
+				position: absolute;
+				width: 170px;
+				right: 0px;
+				top: 0px;
+				border: 1px solid #ccc;
+				margin: 2px;
+			}
+			#timeBar {
+				display: none;
+				position: absolute;
+				bottom: 10px;
+				border-radius: 4px;
+				border: 2px solid #333;
+				background-color: rgba(0,0,0,0.5);
+			}
+			#blog {
+				position: absolute;
+				right: 2px;
+				bottom: 2px;
+			}
+		</style>
+		<script src="js/three.js"></script>
+		<script src="js/Detector.js"></script>
+		<script src="js/stats.min.js"></script>
+		<script src="js/TrackballControls.js"></script>
+		<!-- <script src="../js/shaders/CopyShader.js"></script>
+		<script src="../js/shaders/FXAAShader.js"></script>
+		<script src="../js/postprocessing/EffectComposer.js"></script>
+		<script src="../js/postprocessing/RenderPass.js"></script>
+		<script src="../js/postprocessing/ShaderPass.js"></script>
+		<script src="../js/postprocessing/MaskPass.js"></script> -->
+		<script src="js/ammo.js"></script>
+		<script src="js/encoding.js"></script> 
+		<!-- <script src="../../../js/sha1.js"></script> -->
+		<!-- begin override three.js -->
+		<script src="MMDWebGLRenderer.js"></script>
+		<script src="MODShadowMapPlugin.js"></script>
+		<script src="MODFrustum.js"></script>
+		<!-- end override three.js -->
+		<script src="misc.js"></script>
+		<script src="mmd.three.js"></script>
+</head>
+	<body>
+		<script>
+		window.onload = function() {
+			"use strict";
+			var MMD = THREE.MMD,
+				near = 1, far = 200,
+				scene, scene2, camera, light, renderer,
+				floor, floor2, models = [],
+				camCon, stats, info, button, timeBar, timeRange, timeNumber,
+				lastTime, // frameCount = 0, frameElapsed = 0,
+				_v = new THREE.Vector3(), // temporary
+				//proxy = '../../../crossdomain-proxy.php?url=',
+				//lightParam = {length:40, direction:new THREE.Vector3(-0.5,-1.0,-0.5).normalize()},
+				lightParam = {length:40, angle:-30/180*Math.PI},
+				setLightPos = (function() {
+					var p = new THREE.Vector3(),
+						q = new THREE.Quaternion();
+					return function(light, param) {
+						if (!param.direction) { // position to target
+							param.direction = new THREE.Vector3(0,-1,-1).normalize();
+							//param.direction = new THREE.Vector3(0,-1,-2).normalize();
+						}
+						if (!param.length) {
+							param.length = 100;
+						}
+						if (!param.target) {
+							param.target = new THREE.Vector3();
+						}
+						if (!param.axis) {
+							param.axis = new THREE.Vector3(0,1,0);
+						}
+						if (param.angle === undefined) {
+							param.angle = 0;
+						}
+						p.copy(param.direction);
+						p.multiplyScalar(param.length);
+						q.setFromAxisAngle(param.axis,param.angle);
+						p.applyQuaternion(q);
+						light.target.position.copy(param.target);
+						light.position.subVectors(light.target.position, p);
+					};
+				}()),
+				createFloorMesh = function( size ) {
+					var el,ctx,tex;
+					el = document.createElement("canvas");
+					el.width = el.height = 32;
+					ctx = el.getContext("2d");
+					ctx.fillStyle = "#fff";
+					ctx.fillRect(0, 0, 32, 32);
+					ctx.fillStyle = "#000";
+					ctx.fillRect(0, 0, 16, 16);
+					ctx.fillStyle = "#f66";
+					ctx.fillRect(8, 8, 8, 8);
+					ctx.fillStyle = "#000";
+					ctx.fillRect(16, 16, 16, 16);
+					ctx.fillStyle = "#666";
+					ctx.fillRect(24, 24, 8, 8);
+					tex = new THREE.Texture( el, new THREE.UVMapping(), THREE.RepeatWrapping, THREE.RepeatWrapping );
+					tex.needsUpdate = true;
+					tex.repeat.x = tex.repeat.y = Math.floor(size/10);
+					floor = new THREE.Mesh(new THREE.PlaneGeometry(size, size), new THREE.MeshPhongMaterial( {map:tex } ));
+					floor.position.set( 0, 0, 0 );
+					floor.rotation.x = -Math.PI * 0.5;
+					floor.receiveShadow = true;
+					floor.renderDepth = 1; // far
+					scene.add( floor );
+
+					// 床の裏側から見た時は透過させる。
+					floor2 = new THREE.Mesh(new THREE.PlaneGeometry(size, size), new THREE.MeshPhongMaterial( {map:tex, opacity:0.25, transparent:true, side:THREE.BackSide } ));
+					floor2.position.set( 0, 0, 0 );
+					floor2.rotation.x = -Math.PI * 0.5;
+					floor2.receiveShadow = true;
+					floor2.renderDepth = -1; // near
+					scene.add( floor2 );
+				},
+				createCapsuleGeometry = function(radius, cylinderHeight, segmentsRadius, segmentsHeight) {
+					var geometry = new THREE.CylinderGeometry(radius, radius, cylinderHeight, segmentsRadius, segmentsHeight, true),
+						upperSphere = new THREE.Mesh(new THREE.SphereGeometry(radius, segmentsRadius, segmentsHeight, 0, Math.PI*2, 0, Math.PI/2)),
+						lowerSphere = new THREE.Mesh(new THREE.SphereGeometry(radius, segmentsRadius, segmentsHeight, 0, Math.PI*2, Math.PI/2, Math.PI/2));
+					upperSphere.position.set(0, cylinderHeight/2,0);
+					lowerSphere.position.set(0,-cylinderHeight/2,0);
+					THREE.GeometryUtils.merge(geometry, upperSphere);
+					THREE.GeometryUtils.merge(geometry, lowerSphere);
+					return geometry;
+				},
+				createRigidMesh = function( model ) { // 剛体表示用のメッシュを作る。
+					var materials = [];
+					// group colors
+					[0xffd47f,0xd4ff7f,0x7fff7f,0x7fffd4,0x7fd4ff,0x7f7fff,0xd47fff,0xff5400,0xffff00,0x00ff55,0x00ffff,0x0055ff,0x5400ff,0xff00ff,0xff0054,0x7f7f00].forEach(function(v) {
+						materials.push(new THREE.MeshBasicMaterial({color:v, wireframe:true, depthTest:false, depthWrite:false, opacity:0.25, transparent:true, fog:false}));
+					});
+					model.mesh.geometry.MMDrigids.forEach(function(v) {
+						var geo, mesh;
+						switch (v.shape) {
+						case 0:
+							geo = new THREE.SphereGeometry(v.size[0], 16, 8);
+							break;
+						case 1:
+							// Bullet側は半分サイズ指定なので、ここでは倍にする。
+							geo = new THREE.CubeGeometry(v.size[0]*2, v.size[1]*2, v.size[2]*2, 8, 8, 8);
+							break;
+						case 2:
+							geo = createCapsuleGeometry(v.size[0], v.size[1], 16, 8);
+							break;
+						default:
+							return;
+						}
+						mesh = new THREE.Mesh(geo, materials[v.group]);
+						mesh.renderDepth = -1; // 常に手前に表示させる。
+						mesh.position.set(v.pos[0], v.pos[1], v.pos[2]);
+						mesh.rotation.set(v.rot[0], v.rot[1], v.rot[2]);
+						mesh.quaternion.setFromEuler(mesh.rotation);
+						mesh.useQuaternion = true;
+						v.mesh = mesh;
+						scene2.add(mesh);
+					});
+
+					// 剛体メッシュの位置と回転を更新するコールバックを設定。
+					model.simulateCallback = function() {
+						if ( scene2.visible ) {
+							model.mesh.geometry.MMDrigids.forEach(function(v) {
+								var tr = v.body.getCenterOfMassTransform(),
+									o = tr.getOrigin(),
+									r = tr.getRotation();
+								v.mesh.position.set(o.x(), o.y(), o.z());
+								v.mesh.quaternion.set(r.x(), r.y(), r.z(), r.w());
+								//v.mesh.visible = model.visible;
+							});
+						}
+					};
+				},
+				createGroundRigid = function( world ) { // 地面の剛体を作る。
+					var v = new Ammo.btVector3(),
+						trans = new Ammo.btTransform(),
+						shape, mass = 0, localInertia, motionState, rbInfo, body,
+						mesh; 
+					v.setValue(0, 1, 0);
+					shape = new Ammo.btStaticPlaneShape(v, 0);
+					localInertia = new Ammo.btVector3(0, 0, 0);
+					shape.calculateLocalInertia(mass, localInertia);
+					trans.setIdentity();
+					motionState = new Ammo.btDefaultMotionState(trans);
+					rbInfo = new Ammo.btRigidBodyConstructionInfo(mass, motionState, shape, localInertia);
+					body = new Ammo.btRigidBody(rbInfo);
+					world.addRigidBody(body);
+					Ammo.destroy(rbInfo);
+					Ammo.destroy(localInertia);
+					Ammo.destroy(trans);
+					Ammo.destroy(v);
+
+					// 剛体表示用のメッシュを作る。
+					mesh = new THREE.Mesh(new THREE.CubeGeometry(500,1,500,4,2,4), new THREE.MeshBasicMaterial({color:0xffffff, wireframe:true, depthTest:false, depthWrite:false, opacity:0.25, transparent:true, fog:false}));
+					mesh.renderDepth = -1; // 常に手前に表示させる。
+					mesh.position.y = -0.5;
+					scene2.add( mesh );
+				},
+				createModel = function( pmx, vmd, param, oncreate ) {
+					var model;
+					model = new MMD.Model( pmx, vmd );
+					param = param || {};
+					param.edgeScale = 2;
+					param.shadowDark = 0.3;
+					model.create( param, function() {
+						var mesh;
+						mesh = model.mesh;
+						mesh.castShadow = true;
+						//mesh.receiveShadow = true;
+						mesh.material.materials.forEach( function(v) {
+							v.fog = true; // use scene fog
+							v.lights = true; // use scene light
+							//v.parPixel = true;
+							//v.wrapAround = true;
+						});
+						createRigidMesh( model );
+						MMD.addModel( model );
+						scene.add( mesh );
+
+						oncreate( model );
+					});
+				},
+				play = function() {
+					MMD.playMotion(true);
+					if ( MMD.getCameraMotion() ) {
+						// disable trackball control
+						info.style.display = 'none';
+						camCon.enabled = false;
+					}
+					button.innerHTML = 'PAUSE';
+				},
+				pause = function() {
+					var t;
+					MMD.pauseMotion();
+					t = MMD.getCameraMotion();
+					if ( t ) {
+						// enable trackball control
+						info.style.display = 'block';
+						camCon.enabled = true;
+						camCon.target.copy( t.target );
+					}
+					button.innerHTML = 'START';
+				},
+				putSeekTime = function() {
+					timeNumber.value = parseFloat(timeRange.value).toFixed(2) + '/' + parseFloat(timeRange.max).toFixed(2);
+				},
+				setupUI = function() {
+					var t,floorShadow,modelShadow,edgeRange,edgeNumber,playing/*,first*/;
+
+					// first = true;
+
+					info.innerHTML = 'MOVE mouse &amp; press LEFT/A: rotate, MIDDLE/S: zoom, RIGHT/D: pan';
+					// start/pause
+					button.style.display = 'block';
+					button.onclick = function() {
+						if (!MMD.motionPlaying) {
+							/* if ( first ) {
+								first = false;
+								frameCount = 0;
+								frameElapsed = 0;
+							} */
+							play();
+						} else {
+							pause();
+						}
+					};
+					center(button);
+
+					// time bar
+					timeRange.max = timeNumber.max = models[0].skin.duration;
+					timeRange.onchange = function(e) {
+						var value = parseFloat(this.value);
+						changeTime(value);
+						putSeekTime();
+					};
+					timeRange.oninput = function(e) { // Firefox対策。
+						this.onchange(e);
+					};
+					timeRange.onmousedown = function() {
+						playing = MMD.motionPlaying;
+						if (playing) {
+							//pause();
+							MMD.pauseMotion( true );
+						}
+					};
+					timeRange.onmouseup = function() {
+						if (playing) {
+							//play();
+							MMD.playMotion();
+						}
+					};
+					/* timeNumber.onchange = function() {
+						var value,min,max;
+						value = parseFloat(this.value);
+						if (isNaN(value)) {
+							value = 0;
+						}
+						min = parseFloat(this.min);
+						max = parseFloat(this.max);
+						if (value < min) {
+							value = min;
+						} else
+						if (value > max) {
+							value = max;
+						}
+						changeTime(value);
+						this.value = value;
+						timeRange.value = value;
+					}; */
+					putSeekTime();
+					timeBar.style.display = 'block';
+					center(timeBar);
+
+					// controls
+
+					t = document.getElementById('ctrl');
+					t.style.display = 'block';
+
+					t = document.getElementById('ctrl_fog');
+					t.onchange = function() {
+						var checked = this.checked;
+						floor.material.fog = checked;
+						floor.material.needsUpdate = true;
+						models.forEach(function(v) {
+							v.mesh.material.materials.forEach(function(w) {
+								w.fog = checked;
+								w.needsUpdate = true;
+							});
+						});
+					};
+					//t.onchange(); // init
+
+					t = document.getElementById('ctrl_rigid');
+					t.onchange = function() {
+						scene2.visible = this.checked;
+					};
+					t.onchange(); // init
+
+					floorShadow = document.getElementById('ctrl_floorShadow');
+					floorShadow.onchange = function() {
+						floor.receiveShadow = this.checked;
+						floor.material.needsUpdate = true;
+						renderer.shadowMapAutoUpdate = ( this.checked || modelShadow.checked );
+					};
+					//floorShadow.onchange(); // init
+
+					modelShadow = document.getElementById('ctrl_modelShadow');
+					modelShadow.onchange = function() {
+						var checked = this.checked;
+						models.forEach(function(v) {
+							var mesh = v.mesh;
+							mesh.receiveShadow = checked;
+							mesh.material.materials.forEach(function(w) {
+								w.needsUpdate = true;
+							});
+						});
+						renderer.shadowMapAutoUpdate = ( floorShadow.checked || checked );
+					};
+					//modelShadow.onchange(); // init
+
+					edgeRange = document.getElementById('ctrl_edgeRange');
+					edgeRange.onchange = function() {
+						edgeNumber.value = this.value;
+						changeEdge(parseFloat(this.value));
+					};
+					//edgeRange.onchange(); // init
+
+					edgeNumber = document.getElementById('ctrl_edgeNumber');
+					edgeNumber.onchange = function() {
+						var value,min,max;
+						value = parseFloat(this.value);
+						if (isNaN(value)) {
+							value = 0;
+						}
+						min = parseFloat(this.min);
+						max = parseFloat(this.max);
+						if (value < min) {
+							value = min;
+						} else
+						if (value > max) {
+							value = max;
+						}
+						this.value = value.toString();
+						edgeRange.value = this.value;
+						changeEdge(value);
+					};
+					//edgeNumber.onchange(); // init
+
+					function changeEdge(scale) {
+						models.forEach(function(v) {
+							v.mesh.material.materials.forEach(function(w,i) {
+								var pmxMaterial = v.pmx.materials[i];
+								if ((pmxMaterial.drawFlags & 0x10) !== 0) {
+									w.mmdEdgeThick = pmxMaterial.edgeSize * scale;
+								}
+							});
+						});
+					}
+
+					function changeTime(time) {
+						MMD.seekMotion(time,true); // force update
+					}
+				},
+				init = function() {
+					var backColor, container, pathBase, assets;
+
+					backColor = 0xdfebff;
+
+					// scene
+					scene = new THREE.Scene();
+					scene2 = new THREE.Scene();
+					scene2.visible = false;
+
+					// camera
+					camera = new THREE.PerspectiveCamera( 45, window.innerWidth / window.innerHeight, near, far );
+					//camera.position.set( 0, 10, 28+20 );
+					//camera.position.set( 0, 7, 30 );
+					camera.position.set( 0, 11, 36 );
+					//camera.lookAt( scene.position );
+
+					// fog
+					scene.fog = new THREE.Fog( backColor, (camera.far - camera.near) * 0.6, camera.far );
+
+					// light
+					//scene.add( new THREE.AmbientLight( 0x808080 ) );
+					//light = new THREE.DirectionalLight( 0x999999, 1.5 );
+					scene.add( new THREE.AmbientLight( 0xffffff ) );
+					light = new THREE.DirectionalLight( 0x7f7f7f, 1.0 );
+					light.castShadow = true;
+					//light.onlyShadow = true;
+					light.shadowBias = -0.0025;
+					light.shadowDarkness = 0.7;
+					light.shadowMapWidth = 1024; //2048;
+					light.shadowMapHeight = 1024; //2048;
+					light.shadowCameraNear = 1;
+					light.shadowCameraFar = lightParam.length * 2;
+					light.shadowCameraLeft = -20;
+					light.shadowCameraRight = 20;
+					light.shadowCameraBottom = -20;
+					light.shadowCameraTop = 20;
+					//light.shadowCameraVisible = true; // for debug
+					setLightPos(light,lightParam);
+					scene.add(light);
+
+					// floor
+					createFloorMesh( camera.far * 1.5 );
+
+					// renderer
+					renderer = new THREE.WebGLRenderer();
+					renderer.setSize( window.innerWidth, window.innerHeight );
+					renderer.setClearColor( backColor, 1 );
+					renderer.shadowMapEnabled = true;
+					//renderer.shadowMapType = THREE.BasicShadowMap;
+					//renderer.shadowMapType = THREE.PCFShadowMap;
+					renderer.shadowMapType = THREE.PCFSoftShadowMap;
+					//renderer.shadowMapCullFace = THREE.CullFaceBack;
+					//renderer.shadowMapDebug = true;
+					renderer.autoClear = false;
+					container = document.createElement( 'div' );
+					container.appendChild( renderer.domElement );
+
+					// status display
+					stats = new Stats();
+					stats.domElement.style.position = 'absolute';
+					stats.domElement.style.top = '0px';
+					container.appendChild( stats.domElement );
+
+					// trackball controll
+					camCon = new THREE.TrackballControls( camera, container );
+					camCon.staticMoving = true;
+					camCon.target.set(0,11,0);
+
+					document.body.appendChild( container );
+
+					// on window resize
+					window.addEventListener( 'resize', onWindowResize, false );
+
+					// physics
+					//MMD.STOP_ERP = 0.5; //0.45;
+					createGroundRigid( MMD.getWorld() );
+
+					MMD.init(renderer,scene);
+
+					// load data
+					pathBase = 'MMD/';
+					assets = {
+						//main: { url:'hatsune_miku.pmx' },
+						//main: { url:'yowane_haku.pmx' },
+						//main: { url:'akita_neru.pmx' },
+						//main: { url:'hatsune_miku_ver2.pmx' },
+						//main: { url:'hatsune_miku_metal.pmx' },
+						//main: { url:'yua/yua.pmx' },
+						//main: { url:'hina/hina.pmx' },
+						//main: { url:'aoi/aoi.pmx' },
+						//main: { url:'koharu/koharu.pmx' },
+						//main: { url:'ChibiAppearanceMiku/ChibiAppearanceMiku.pmx' },
+						//main: { url:'miku(773)/miku(773)1_0.pmx' },
+						//main: { url:'miku_v2_sdef/miku_v2_sdef.pmx' },
+						main: { url:'TdaMikuAppendVer1/TdaMikuAppendVer1.pmx', param:{ textureAlias:{ bmp:'dds', png:'dds', tga:'dds'} }},
+						//main: { url:'MikuEX_1.15Beta/MikuEX_1.15Beta.pmx' },
+						//main: { url:'stdPMXpack/HatsuneMiku_imitationV1mini2.pmx' },
+						//main: { url:'CustomDefokoVer1.0.1/CustomDefokoVer1.0.1.pmx' },
+						//main: { url:'TuneChan/TuneChan.pmx' },
+						//main: { url:'miku_1052C-Re/miku_1052C-Re.pmx', param:{ textureAlias:{ tga:'png'} } },
+						//main: { url:'miku_HP102/miku_HP102.pmx' },
+						//mot: { url:'kishimen.vmd' },
+						//mot_env: { url:'kishimen_env.vmd' },
+						//mot: { url:'mikkumiku.vmd' },
+						//mot: { url:'odds_ends/odds_ends_motion.vmd' },
+						//mot: { url:'TellYourWorld.vmd' },
+						//mot: { url:'YAHHO_MikuVer2.vmd' },
+						//mot: { url:'sakura.vmd' },
+						//mot_env: { url:'sakura_cam.vmd' },
+						//mot: { url:'kagerou.vmd' },
+						//mot_env: { url:'kagerou_cam.vmd' },
+						mot: { url:'SoMuchLovingYou.vmd' },
+						mot_env: { url:'SoMuchLovingYou_cam.vmd' },
+						//sub1: { url:'yowane_haku.pmx', param:{ position: new THREE.Vector3(-10,0,-10)/*, rotation: new THREE.Vector3(0,-Math.PI/4,0)*/ } },
+						//sub2: { url:'akita_neru.pmx', param:{ position: new THREE.Vector3(10,0,-10) } },
+					};
+					MMD.loadAssets( assets, pathBase, function() {
+						var monitor;
+						monitor = new Misc.EventMonitor();
+						monitor.add( function() {
+							// ready!
+							MMD.adjustMotionDuration();
+							renderer.initWebGLObjects(scene); // 明示的にやっておく。
+
+							/* MMD.onmotionended = function() {
+								console.log( frameElapsed / frameCount );
+								frameElapsed = frameCount = 0;
+							}; */
+
+							/* // test: onended
+							MMD.onmotionended = function() {
+								//alert('ended!' + (MMD.motionLoop ? '(loop)' : '') );
+								console.log('ended!' + (MMD.motionLoop ? '(loop)' : '') );
+							}; */
+
+							/* // test: dispose
+							MMD.onmotionended = function() {
+								var model;
+								pause();
+								model = models[0];
+								MMD.removeModel(model);
+								scene.remove(model.mesh);
+								model.dispose();
+								renderer.initWebGLObjects(scene); // 明示的にやっておく。
+							}; */
+
+							// 物理演算を数秒間更新させて安定を試みるのでUIのセットアップは遅らせる。
+							//setTimeout( setupUI, 2000 );
+
+							setupUI();
+						});
+
+						// main model
+						monitor.add();
+						createModel( assets.main.obj, assets.mot.obj, assets.main.param, function( model ) {
+							models[0] = model;
+							monitor.del();
+						});
+
+						if ( assets.sub1 ) {
+							// sub model 1
+							monitor.add();
+							createModel( assets.sub1.obj, assets.mot.obj, assets.sub1.param, function( model ) {
+								models[1] = model;
+								monitor.del();
+							});
+						}
+
+						if ( assets.sub2 ) {
+							// sub model 2
+							monitor.add();
+							createModel( assets.sub2.obj, assets.mot.obj, assets.sub2.param, function( model ) {
+								models[2] = model;
+								monitor.del();
+							});
+						}
+
+						if ( assets.mot_env ) {
+							// camera and/or light motion
+							MMD.setupCameraMotion( assets.mot_env.obj, camera );
+							MMD.setupLightMotion( assets.mot_env.obj, light );
+						}
+
+						monitor.del();
+					});
+				},
+				getBoxWidth = function(el) {
+					var e,s,w,parent,
+						_parseFloat = function(v) {
+							return parseFloat(v) || 0;
+						};
+					e = el.cloneNode(true);
+					parent = document.body;
+					parent.appendChild(e);
+					s = getComputedStyle(e,'');
+					w = e.offsetWidth + _parseFloat(s.marginLeft) + _parseFloat(s.marginRight);
+					parent.removeChild(e);
+					return w;
+				},
+				center = function(el) {
+					el.style.left = (window.innerWidth - getBoxWidth(el))/2 + 'px';
+				},
+				onWindowResize = function() {
+					var w = window.innerWidth, h = window.innerHeight;
+					camera.aspect = w / h;
+					camera.updateProjectionMatrix();
+					renderer.setSize(w, h);
+					camCon.handleResize();
+					center(button);
+					center(timeBar);
+				},
+				animate = function( time ) {
+					var delta, mesh;
+					delta = (time - lastTime) * 0.001; // millisec to sec
+					lastTime = time;
+					MMD.updateMotion( delta );
+					if (MMD.motionPlaying) {
+						timeRange.value = models[0].skin.time;
+						putSeekTime();
+
+						// うまく影が落ちるように光源位置を調整。
+						mesh = models[0].mesh;
+						if ( MMD.getLightMotion() ) {
+							_v.copy( mesh.position );
+							_v.add( mesh.bones[0].position ); // skeleton center
+							light.position.copy( light.target.position ).normalize(); // dir
+							light.position.multiplyScalar( -lightParam.length );
+							light.position.add( _v );
+							light.target.position.copy( _v );
+						} else {
+							lightParam.target.copy( mesh.position );
+							lightParam.target.add( mesh.bones[0].position ); // skeleton center
+							setLightPos( light, lightParam );
+						}
+					}
+					camCon.update();
+					renderer.render( scene, camera, undefined, true); // force clear
+					if ( scene2.visible ) {
+						renderer.render( scene2, camera );
+					}
+					stats.update();
+					requestAnimationFrame( animate );
+					// frameCount++;
+					// frameElapsed += ( performance.now() - time ) * 0.001;
+				};
+
+			if ( !Detector.webgl ) {
+				Detector.addGetWebGLMessage();
+				return;
+			}
+
+			info = document.getElementById('info');
+			info.innerHTML = '<img src="loading.gif">';
+			button = document.getElementById('button');
+			timeBar = document.getElementById('timeBar');
+			timeRange = document.getElementById('timeRange');
+			timeNumber = document.getElementById('timeNumber');
+
+			init();
+			lastTime = performance.now();
+			animate( lastTime );
+		};
+		</script>
+		<div id="info"></div>
+		<div id="button">START</div>
+		<div id="ctrl">
+			<div><input id="ctrl_fog" type="checkbox" checked>fog</div>
+			<div><input id="ctrl_rigid" type="checkbox">rigid body</div>
+			<div><input id="ctrl_floorShadow" type="checkbox" checked>floor shadow</div>
+			<div><input id="ctrl_modelShadow" type="checkbox">model shadow</div>
+			<table>
+				<caption style="border-top:1px solid #ccc;">outline scale</caption>
+				<tr>
+					<td><input id="ctrl_edgeRange" type="range" value="2" min="0.0" max="10.0" step="0.1" style="width:100px;"></td>
+					<td><input id="ctrl_edgeNumber" type="number" value="2" min="0.0" max="10.0" step="0.1" style="width:50px;"></td>
+				</tr>
+			</table>
+		</div>
+		<table id="timeBar">
+			<tr>
+				<td><input id="timeRange" type="range" value="0" min="0.0" max="10.0" step="0.0166666667" style="width:400px;"></td>
+				<td><input id="timeNumber" type="text" value="" readonly style="width:100px;"></td>
+			</tr>
+		</table>
+		<div id="blog"><a href="http://www20.atpages.jp/katwat/wp/?p=4199" target="_blank">ブログの記事</a></div>
+	</body>
+</html>
